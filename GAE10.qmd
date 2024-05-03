@@ -1,11 +1,12 @@
 ---
 title: "GAE10: PCA & NMDS"
-author: "Your Name Here"
+author: "Mitch Mullin"
 format: 
   html:
     theme: custom.scss
     embed-resources: true
     code-tools: true
+    warning: FALSE
 
 csl: ecology.csl
 editor: visual
@@ -22,9 +23,14 @@ knitr::opts_chunk$set(
   )
 
 library(latex2exp)
-library(patchwork)
-library(kableExtra)
-library(tidyverse)
+library(patchwork) #Creates multiple panels for a single figure.
+library(kableExtra) #Creates tables.
+library(tidyverse) #Cleans up ggplot graphs.
+library(vegan) #
+library(ggrepel) #Accompanies ggplot2 to allow labels to automatically dodge and not overlap.
+library(FactoMineR)
+library(factoextra)
+library(rmarkdown) #To remove warnings from my R Markdown html output.
 
 options(scipen = 10)
 
@@ -52,6 +58,8 @@ knitr::include_graphics("Kingfishers.png")
 
 #### Statistical Methods:
 
+For this statistical analysis, I used a principle components analysis (PCA) to examine any patterns of coloration in bird from the order *Coraciiformes*. All analyses were conducted in R [@base] using the tidyverse, kableExtra, FactoMineR, and factoextra packages [@tidyverse; @kableExtra; @FactoMineR; @factoextra]. I created a PCA model using the 'PCA()' function from the [@FactoMineR] package, and then graphed that model on a biplot using the 'fviz_pca_ind()' and 'fviz_pca_var()' functions found in the [@factoextra] package.
+
 ```{r}
 #| label: Scenario1DataImport
 
@@ -62,9 +70,51 @@ knitr::include_graphics("Kingfishers.png")
 # colors.csv. Please explore any grouping and/or patterning among the species
 # and their ecological/behavioral traits.
 
+scen1data <- read_csv("colors.csv", show_col_types = FALSE)
+  #Show_col_types = FALSE is used to prevent R from telling you what type of data you have.
+
 ```
 
-### References:
+### Results
+
+The major variable groups (hunting strategies, light environment, parental care, territoriality) were individually graphed on a bi-plot (not-shown below), and the hunting strategies variables, which includes the morphological variables, show the greatest level of variation between the data points and explanation of the variation. Variable groups were then visualized with ellipses representing 95% confidence intervals, which broadly overlapped, suggesting that the variables don't differ in a statistically significant manner. @fig-scen1biplot shows the morphological variables visualized using a PCA. The vectors that are closer to the x-axis are more correlated with principle component 1 (PC1), suggesting that morphological variables like crown and nape are more highly correlated with a blue plumage coloration. The vectors closer to the y-axis, especially the variables belly and breast, are suggested to be more correlated with red/green plumage coloration (PC2/Dim2).
+
+```{r, warnings=FALSE}
+#| label: fig-scen1biplot
+#| fig-cap: "Bi-plots demonstrating a Principle Components Analysis of the correlation of different Kingfisher morphological features. The correlation is compared to blue plumage coloration (PC1) or red/green plumage coloration (PC2), and data is represented both by variables (top) and individual observations (bottom). Data originates from the study by @babarovicEffectsEcologyBehavior2023."
+#| fig-asp: 1
+
+#Here I create a biplot to conduct a PCA analysis.
+scen1PCA <- PCA(
+  scen1data,
+  quanti.sup = 13,         #Name which column is quantitative.
+  quali.sup = c(1, 14:17), #Name which columns are qualitative, using the c()                                  function to bind them.
+  graph = FALSE
+)
+
+Indfig <- fviz_pca_ind(
+  scen1PCA,
+  repel = TRUE,
+  label = "none",
+  habillage = c(
+    # "Light_environment",
+    # "Parental_care",
+    # "Territoriality",
+    "Hunting_strategy"
+    ),
+  # addEllipses = TRUE
+)
+Varfig <- fviz_pca_var(
+  scen1PCA,
+  repel = TRUE,
+  label = "var"
+)
+
+Varfig +
+  Indfig +
+  plot_layout(ncol =1)
+
+```
 
 ------------------------------------------------------------------------
 
@@ -78,6 +128,8 @@ In Summer 2011, the researchers visited 17 deer exclosures in upland forests of 
 
 #### Statistical Methods:
 
+For this statistical analysis, I used a non-metric multidimensional scaling (nMDS) technique to examine any patterns of indirect impacts of white-tailed deer presence on plant assemblages. All analyses were conducted in R [@base] using the tidyverse, kableExtra, and vegan packages [@tidyverse; @kableExtra; @vegan]. I created an nMDS model using the 'metaMDS()' function found in the vegan package [@vegan]. I then used the 'adonis2' function also found in the vegan package to create a PERMANOVA model, and the 'kbl()' function found in the kableExtra package [@kableExtra] to make a PERMANOVA table.
+
 ```{r}
 #| label: Scenario2DataImport
 
@@ -88,6 +140,59 @@ In Summer 2011, the researchers visited 17 deer exclosures in upland forests of 
 # Use NMDS to explore the differences in plant community inside and outside the
 # deer exclosures, then test for differences in the plant communities between
 # the deer exclosures and the adjacent forests.
+
+df2 <- read_csv("Sabo_etal_data.csv", show_col_types = FALSE)
+```
+
+### Results:
+
+Graphs were created separately from this analysis, and the confidence intervals noticeably overlapped, therefore they were not produced and analyzed in this statistical analysis.
+
+The correlation coefficient for the treatment is 0.011 and is not statistically significant (p = 0.989). We therefore fail to reject the null hypothesis that the two populations are the same.
+
+```{r}
+#| label: scen2nMDS
+#| results: "hide"
+
+#Here I made a model for nMDS, removing the first two columns since they are just descriptor data, and labelling 2 dimensions since this is multi-dimensional scaling.
+
+scen2mds <- metaMDS(
+  df2[,-c(1:2)],
+  k=2
+)
+
+#We want to define and check stress levels too, as low stress levels are good for our data analysis.
+
+scen2mds$stress
+
+#Stress is 0.159, which is greater than 0.10. This raises one alarm, but isn't awful. I changed the dimensions to k=4, and now it's 0.08.
+#Trade offs: if you use more than 2 dimensions, you have to make more graphs to interpret. Or you could just reduce the dimensions back to 2 and interpret from there.
+```
+
+```{r}
+#| label: tbl-scen2PERMANOVA
+#| tbl-cap: "PERMANOVA to test for a difference in plant assemblages between deer exclusion areas and adjacent areas using data from @sabo2017."
+
+scen2PERMANOVA <- adonis2(
+  df2[,-c(1,2)] ~ Treatment,
+  data = df2,
+  by = "margin",
+  permutations = 10001
+)
+
+kbl(
+  scen2PERMANOVA,
+  format = "markdown",
+  digits = c(0,3,3,3,3),
+  col.names = c(
+    "df",
+    "SS",
+    "$R^2$",
+    "F",
+    "P"
+  )
+)
+
 ```
 
 ### References:
